@@ -1,0 +1,131 @@
+---
+title: "Reproduceable research Course project 1"
+author: "Jacob Mokgadi"
+date: "25/01/2022"
+output: html_document
+---
+
+
+
+## Load the data
+Load the data
+
+```{r}
+get.data <- function (){
+        if (!file.exists("data")) {
+        message("Creating Data folder in working directory")
+        dir.create("data")
+        }
+
+        if(!file.exists("data/repdata-data-activity")) {
+        fileURL <- "http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+        download.file(fileURL, destfile = "./data/repdata-data-activity.zip")
+        file.name <- "./data/repdata-data-activity.zip"
+        unzip(file.name, exdir = "data")
+        unlink(file.name)
+}
+else message("data already exists")
+}
+get.data()
+activity <- read.csv("./data/activity.csv", colClasses = c("numeric", "Date", "numeric"))
+activity$day <- weekdays(activity$date)
+summary(activity)
+```
+## Steps taken per day
+
+```{r}
+stepsPerDay <- aggregate(steps ~ date, activity, sum, na.rm=TRUE)
+stepsPerDay
+```
+## Histogram of the total number of steps taken per day
+
+```{r}
+require (ggplot2)
+activityAgg <- aggregate(steps ~ date, activity, sum, na.rm = TRUE)
+qplot(steps, data = activityAgg, binwidth = 1400) +
+theme_bw()
+```
+
+Mean Steps per day
+```{r}
+mean(activityAgg$steps)
+```
+
+Median steps per day
+```{r}
+median(activityAgg$steps)
+```
+
+## Average Daily activity
+Time series plot of the 5-minute interval and the average number of steps taken.
+
+```{r}
+intervalAve <- aggregate(steps ~ interval, activity, mean, na.rm = TRUE)
+ggplot(intervalAve, aes(x=interval,y=steps)) + 
+geom_line(color="purple",size=1) +  
+labs(x="Interval",y="Average Number of Steps") +
+theme_bw()
+```
+
+## 5-minute interval containing the maximum number of steps
+```{r}
+intervalAve[which.max(intervalAve$steps),]$interval
+```
+
+## Inputing Missing Values
+
+Number of missing values
+```{r}
+sum(is.na(activity))
+```
+
+## Method for inputing missing steps
+Missing step values (NA) were replaced by the mean number of steps taken for the corresponding time interval and weekday. 
+
+## create new dataset using the imputed values
+```{r}
+intdayAve <- aggregate(steps ~ interval + day, activity, mean, na.rm = TRUE)
+activityImpute <- merge(activity, intdayAve, by=c("interval", "day"))
+activityImpute <- transform(activityImpute, steps.x = ifelse(is.na(steps.x),steps.y,steps.x))
+activityImpute <- data.frame(activityImpute[,1:4])
+names(activityImpute) <- c("interval", "day","steps", "date")
+activityImpute$steps <- round(activityImpute$steps, digits = 0)
+activityImpute <- activityImpute[order(activityImpute$date, activityImpute$interval),]
+```
+
+## Histogram of total number of steps taken per day, using new dataset
+
+```{r}
+activityImputeAgg <- aggregate(steps ~ date, activityImpute, sum, na.rm = TRUE)
+qplot(steps, data = activityImputeAgg, binwidth = 1400) +
+theme_bw()
+```
+
+## Mean steps per day with inputed values
+```{r}
+mean(activityImputeAgg$steps)
+```
+
+## Median steps per day with inputed values
+```{r}
+median(activityImputeAgg$steps)
+```
+Including the inputed values in the dataset, both the median and the mean total number of steps taken per day increase, as expected
+
+
+## Investigating Differences in Activity Patterns
+```{r}
+activityImpute$daytype <- ifelse(activityImpute$day %in% c("Saturday", "Sunday"),"Weekend", "Weekday")
+activityImputeDayAgg <- aggregate(steps ~ interval + daytype, activityImpute, mean)
+ggplot(activityImputeDayAgg, aes(x=interval,y=steps)) + 
+geom_line(color="purple",size=1) + 
+facet_wrap(~daytype, nrow=2, ncol=1) + 
+labs(x="Interval",y="Number of Steps") +
+theme_bw()
+```
+
+
+
+
+
+
